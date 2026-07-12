@@ -1,0 +1,101 @@
+{% extends "base.html" %}
+{% block content %}
+<h1>Today's Menu — {{ today.strftime('%A, %d %b') }}</h1>
+
+{% macro nutrition(dish) %}
+{% if dish.protein_grams or dish.calories %}
+<span class="nutrition">
+  {% if dish.protein_grams %}{{ dish.protein_grams|round|int }}g protein{% endif %}{% if dish.protein_grams and dish.calories %} &middot; {% endif %}{% if dish.calories %}{{ dish.calories }} kcal{% endif %}
+</span>
+{% endif %}
+{% endmacro %}
+
+{% macro ingredient_tags(dish) %}
+{% if dish.ingredients %}
+<div class="ingredients">
+  {% for ing in dish.ingredients.split(',') %}
+  <form method="post" action="/menu/mark_unavailable" class="ing-form">
+    <input type="hidden" name="ingredient_name" value="{{ ing.strip() }}" />
+    <button type="submit" class="ing-tag" title="Mark '{{ ing.strip() }}' as unavailable">{{ ing.strip() }} &times;</button>
+  </form>
+  {% endfor %}
+</div>
+{% endif %}
+{% endmacro %}
+
+{% macro meal_section(meal_key, meal_label, chosen, candidates) %}
+<div class="card">
+  <h2>{{ meal_label }}</h2>
+
+  {% if candidates %}
+    <p class="hint">Tap "Choose this" on any dish to select it — tapping another one swaps it instantly. Tap an ingredient to mark it unavailable.</p>
+    <div class="candidates">
+      {% for dish in candidates %}
+      {% set is_selected = chosen and dish.id == chosen.id %}
+      <div class="candidate {{ 'selected' if is_selected else '' }}">
+        <div class="candidate-name">
+          {{ dish.name }}{% if dish.protein_source %} <span class="tag">{{ dish.protein_source }}</span>{% endif %}
+          {% if is_selected %}<span class="selected-badge">&check; Selected</span>{% endif %}
+        </div>
+        {{ nutrition(dish) }}
+        {{ ingredient_tags(dish) }}
+        {% if dish.recipe_url %}<a href="{{ dish.recipe_url }}" target="_blank">recipe</a>{% endif %}
+        {% if is_selected %}
+        <form method="post" action="/menu/change">
+          <input type="hidden" name="meal" value="{{ meal_key }}" />
+          <button class="secondary" type="submit">Remove</button>
+        </form>
+        {% else %}
+        <form method="post" action="/menu/select">
+          <input type="hidden" name="meal" value="{{ meal_key }}" />
+          <input type="hidden" name="dish_id" value="{{ dish.id }}" />
+          <button type="submit">Choose this</button>
+        </form>
+        {% endif %}
+      </div>
+      {% endfor %}
+    </div>
+    <details>
+      <summary>Choose a different dish instead</summary>
+      <form method="post" action="/menu/select">
+        <input type="hidden" name="meal" value="{{ meal_key }}" />
+        <select name="dish_id">
+          {% for d in all_dishes %}
+          <option value="{{ d.id }}">{{ d.name }}</option>
+          {% endfor %}
+        </select>
+        <button class="secondary" type="submit">Select</button>
+      </form>
+    </details>
+  {% else %}
+    <p class="hint">No eligible dishes right now — check <a href="/pantry">Pantry</a> or <a href="/dishes">Dishes</a>.</p>
+  {% endif %}
+</div>
+{% endmacro %}
+
+{{ meal_section("breakfast", "Breakfast (optional)", breakfast, breakfast_candidates) }}
+{{ meal_section("lunch", "Lunch", lunch, lunch_candidates) }}
+{{ meal_section("dinner", "Dinner", dinner, dinner_candidates) }}
+
+{% if lunch and dinner %}
+<div class="card">
+  <h2>Status: {{ menu.status.value }}</h2>
+  {% if menu.status.value == "approved" %}
+    <p class="approved">✓ Approved — send the message below to the cook.</p>
+  {% else %}
+    <form method="post" action="/menu/approve">
+      <label>Notes for cook <input type="text" name="notes" value="{{ menu.notes or '' }}" placeholder="e.g. less spicy today" /></label>
+      <button type="submit">Approve menu</button>
+    </form>
+  {% endif %}
+</div>
+{% endif %}
+
+{% if whatsapp_text %}
+<div class="card">
+  <h2>WhatsApp message</h2>
+  <pre id="wa-text">{{ whatsapp_text }}</pre>
+  <button onclick="navigator.clipboard.writeText(document.getElementById('wa-text').innerText)">Copy text</button>
+</div>
+{% endif %}
+{% endblock %}

@@ -1,0 +1,12 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "cookhelper",
+      "runtimeExecutable": "bash",
+      "runtimeArgs": ["-c", ".venv/bin/uvicorn app.main:app --reload --port $PORT"],
+      "port": 8000,
+      "autoPort": true
+    }
+  ]
+}

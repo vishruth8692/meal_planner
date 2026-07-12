@@ -1,0 +1,65 @@
+{% extends "base.html" %}
+{% block content %}
+<h1>Family Profile</h1>
+
+{% if not members %}
+<div class="card onboarding">
+  <p>Welcome! Add at least one family member and set your household preferences below to get started — then head to <strong>Today</strong> for menu suggestions.</p>
+</div>
+{% else %}
+<div class="card onboarding">
+  <a href="/">&larr; Continue to today's menu</a>
+</div>
+{% endif %}
+
+<div class="card">
+  <h2>Household settings</h2>
+  <form method="post" action="/profile/settings">
+    <label>
+      <input type="checkbox" name="allow_non_veg" {% if settings.allow_non_veg %}checked{% endif %} />
+      Allow non-veg dishes to be suggested
+    </label>
+    <label>
+      Don't repeat a dish within (days)
+      <input type="number" name="repeat_gap_days" value="{{ settings.repeat_gap_days }}" min="0" />
+    </label>
+    <button type="submit">Save settings</button>
+  </form>
+</div>
+
+<div class="card">
+  <h2>Members</h2>
+  <table>
+    <tr><th>Name</th><th>Kid?</th><th>Diet</th><th>High protein</th><th>Restrictions</th><th></th></tr>
+    {% for m in members %}
+    <tr>
+      <td>{{ m.name }}</td>
+      <td>{{ "Yes" if m.is_kid else "No" }}</td>
+      <td>{{ m.diet.value }}</td>
+      <td>{{ "Yes" if m.high_protein_focus else "No" }}</td>
+      <td>{{ m.restrictions or "" }}</td>
+      <td><form method="post" action="/profile/member/{{ m.id }}/delete"><button class="secondary" type="submit">Remove</button></form></td>
+    </tr>
+    {% endfor %}
+  </table>
+</div>
+
+<div class="card">
+  <h2>Add member</h2>
+  <form method="post" action="/profile/member/add">
+    <label>Name <input type="text" name="name" required /></label>
+    <label><input type="checkbox" name="is_kid" /> Is a kid</label>
+    <label>
+      Diet
+      <select name="diet">
+        <option value="veg">Veg</option>
+        <option value="egg">Eggetarian</option>
+        <option value="non_veg">Non-veg</option>
+      </select>
+    </label>
+    <label><input type="checkbox" name="high_protein_focus" /> High protein focus</label>
+    <label>Restrictions <input type="text" name="restrictions" placeholder="e.g. no peanuts, low oil" /></label>
+    <button type="submit">Add member</button>
+  </form>
+</div>
+{% endblock %}

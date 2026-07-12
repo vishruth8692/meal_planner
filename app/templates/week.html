@@ -1,0 +1,34 @@
+{% extends "base.html" %}
+{% block content %}
+<h1>This Week's Plan</h1>
+<p class="hint">A forward-looking suggestion so you can shop ahead. Today's meals here are just a preview — pick and approve the actual day on <a href="/">Today</a>. Nothing here is locked in.</p>
+
+<div class="card">
+  <table>
+    <tr><th>Day</th><th>Breakfast</th><th>Lunch</th><th>Dinner</th></tr>
+    {% for day, day_plan in plan %}
+    <tr>
+      <td>{{ day.strftime('%a %d %b') }}</td>
+      <td>{{ day_plan.breakfast.name if day_plan.breakfast else "—" }}</td>
+      <td>{{ day_plan.lunch.name if day_plan.lunch else "—" }}</td>
+      <td>{{ day_plan.dinner.name if day_plan.dinner else "—" }}</td>
+    </tr>
+    {% endfor %}
+  </table>
+</div>
+
+<div class="card">
+  <h2>Ingredients to have ready this week</h2>
+  {% set all_ingredients = [] %}
+  {% for day, day_plan in plan %}
+    {% for dish in [day_plan.breakfast, day_plan.lunch, day_plan.dinner] %}
+      {% if dish and dish.ingredients %}
+        {% for ing in dish.ingredients.split(',') %}
+          {% if ing.strip() not in all_ingredients %}{% set _ = all_ingredients.append(ing.strip()) %}{% endif %}
+        {% endfor %}
+      {% endif %}
+    {% endfor %}
+  {% endfor %}
+  <p>{{ all_ingredients|sort|join(', ') }}</p>
+</div>
+{% endblock %}

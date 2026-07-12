@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>CookHelper</title>
+  <link rel="stylesheet" href="/static/style.css" />
+</head>
+<body>
+  <nav>
+    {% if current_user %}
+    <a href="/">Today</a>
+    <a href="/week">This week</a>
+    <a href="/profile">Family</a>
+    <a href="/dishes">Dishes</a>
+    <a href="/pantry">Pantry</a>
+    <span class="nav-spacer"></span>
+    <span class="nav-user">{{ current_user.username }}</span>
+    <form method="post" action="/logout" class="nav-logout"><button class="secondary" type="submit">Log out</button></form>
+    {% else %}
+    <a href="/login">Log in</a>
+    <a href="/signup">Sign up</a>
+    {% endif %}
+  </nav>
+  <main>
+    {% block content %}{% endblock %}
+  </main>
+</body>
+</html>
