@@ -49,7 +49,7 @@ class FamilyMember(SQLModel, table=True):
 class HouseholdSettings(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
     owner_id: int = Field(foreign_key="user.id", unique=True, index=True)
-    repeat_gap_days: int = 3  # don't repeat a dish within this many days
+    repeat_gap_days: int = 7  # don't repeat a dish within this many days
     cuisine_preference: CuisineRegion = CuisineRegion.universal
     household_diet: DietType = DietType.veg
 
