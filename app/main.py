@@ -394,7 +394,6 @@ def delete_member(request: Request, member_id: int, session: Session = Depends(g
 @app.post("/profile/settings")
 def update_settings(
     request: Request,
-    allow_non_veg: bool = Form(False),
     repeat_gap_days: int = Form(3),
     cuisine_preference: str = Form("universal"),
     session: Session = Depends(get_session),
@@ -406,7 +405,6 @@ def update_settings(
     if settings is None:
         settings = HouseholdSettings(owner_id=user.id)
         session.add(settings)
-    settings.allow_non_veg = allow_non_veg
     settings.repeat_gap_days = repeat_gap_days
     settings.cuisine_preference = CuisineRegion(cuisine_preference)
     session.commit()

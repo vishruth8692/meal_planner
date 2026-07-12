@@ -14,11 +14,8 @@
 
 <div class="card">
   <h2>Household settings</h2>
+  <p class="hint">Non-veg dishes are suggested automatically as soon as any family member below has their diet set to "Non-veg" — no separate toggle needed.</p>
   <form method="post" action="/profile/settings">
-    <label>
-      <input type="checkbox" name="allow_non_veg" {% if settings.allow_non_veg %}checked{% endif %} />
-      Allow non-veg dishes to be suggested
-    </label>
     <label>
       Don't repeat a dish within (days)
       <input type="number" name="repeat_gap_days" value="{{ settings.repeat_gap_days }}" min="0" />
