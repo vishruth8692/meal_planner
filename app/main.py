@@ -35,6 +35,16 @@ templates = Jinja2Templates(directory="app/templates")
 templates.env.globals["dish_emoji"] = dish_emoji
 
 
+@app.middleware("http")
+async def no_cache_html(request: Request, call_next):
+    """Every page here is generated fresh from the DB on each request (suggestions, menus,
+    preferences) — never let a browser serve a stale cached copy via back/forward nav."""
+    response = await call_next(request)
+    if not request.url.path.startswith("/static"):
+        response.headers["Cache-Control"] = "no-store"
+    return response
+
+
 @app.on_event("startup")
 def on_startup():
     init_db()
