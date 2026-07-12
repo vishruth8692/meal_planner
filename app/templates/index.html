@@ -10,6 +10,15 @@
 <p class="hint">It's Sunday — lunch &amp; dinner lean non-veg for households that eat it, and there's a veg Sunday Special offered separately below.</p>
 {% endif %}
 
+{% if whatsapp_text %}
+<div class="card">
+  <h2>WhatsApp message</h2>
+  <p class="hint">Updates as you pick meals — copy and send anytime.</p>
+  <pre id="wa-text">{{ whatsapp_text }}</pre>
+  <button onclick="navigator.clipboard.writeText(document.getElementById('wa-text').innerText)">Copy text</button>
+</div>
+{% endif %}
+
 {% for meal in meals %}
 <div class="card">
   <div class="meal-title-row">
@@ -97,11 +106,4 @@
 </div>
 {% endif %}
 
-{% if whatsapp_text %}
-<div class="card">
-  <h2>WhatsApp message</h2>
-  <pre id="wa-text">{{ whatsapp_text }}</pre>
-  <button onclick="navigator.clipboard.writeText(document.getElementById('wa-text').innerText)">Copy text</button>
-</div>
-{% endif %}
 {% endblock %}

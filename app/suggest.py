@@ -217,13 +217,14 @@ def plan_week(
     for i in range(days):
         day = start + timedelta(days=i)
         day_plan: dict[str, Optional[Dish]] = {}
+        used_today: set[int] = set()
         for meal in WEEK_MEALS:
-            candidates = get_candidates(
-                session, owner_id, meal, count=1, exclude_dish_ids=used_this_week[meal], target_date=day
-            )
+            exclude = used_this_week[meal] | used_today
+            candidates = get_candidates(session, owner_id, meal, count=1, exclude_dish_ids=exclude, target_date=day)
             dish = candidates[0] if candidates else None
             if dish:
                 used_this_week[meal].add(dish.id)
+                used_today.add(dish.id)
             day_plan[meal.value] = dish
         plan.append((day, day_plan))
     return plan

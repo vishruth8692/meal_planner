@@ -34,7 +34,7 @@ from app.suggest import (
 )
 from app.visuals import dish_emoji
 
-app = FastAPI(title="CookHelper")
+app = FastAPI(title="MealPlanner")
 app.add_middleware(SessionMiddleware, secret_key=os.environ.get("SECRET_KEY", "dev-only-insecure-secret"))
 app.mount("/static", StaticFiles(directory="app/static"), name="static")
 templates = Jinja2Templates(directory="app/templates")
@@ -195,13 +195,19 @@ def _get_or_create_menu(session: Session, owner_id: int, target_date: date) -> D
 
 
 def _whatsapp_text(
-    menu: DailyMenu, breakfast: Optional[Dish], lunch: Dish, dinner: Dish, sunday_special: Optional[Dish]
+    menu: DailyMenu,
+    breakfast: Optional[Dish],
+    lunch: Optional[Dish],
+    dinner: Optional[Dish],
+    sunday_special: Optional[Dish],
 ) -> str:
     lines = [f"Menu for {menu.menu_date.strftime('%d %b')}:"]
     if breakfast:
         lines.append(f"Breakfast: {breakfast.name}" + (f" ({breakfast.recipe_url})" if breakfast.recipe_url else ""))
-    lines.append(f"Lunch: {lunch.name}" + (f" ({lunch.recipe_url})" if lunch.recipe_url else ""))
-    lines.append(f"Dinner: {dinner.name}" + (f" ({dinner.recipe_url})" if dinner.recipe_url else ""))
+    if lunch:
+        lines.append(f"Lunch: {lunch.name}" + (f" ({lunch.recipe_url})" if lunch.recipe_url else ""))
+    if dinner:
+        lines.append(f"Dinner: {dinner.name}" + (f" ({dinner.recipe_url})" if dinner.recipe_url else ""))
     if sunday_special:
         lines.append(
             f"Sunday Special: {sunday_special.name}"
@@ -280,7 +286,11 @@ def dashboard(request: Request, session: Session = Depends(get_session)):
     all_dishes = session.exec(
         select(Dish).where(Dish.owner_id == user.id, Dish.active == True).order_by(Dish.name)  # noqa: E712
     ).all()
-    whatsapp_text = _whatsapp_text(menu, breakfast, lunch, dinner, sunday_special) if (lunch and dinner) else ""
+    whatsapp_text = (
+        _whatsapp_text(menu, breakfast, lunch, dinner, sunday_special)
+        if (breakfast or lunch or dinner or sunday_special)
+        else ""
+    )
 
     out_of_stock_names = get_out_of_stock_names(session, user.id)
 

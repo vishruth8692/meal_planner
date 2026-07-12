@@ -3,14 +3,14 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>CookHelper</title>
+  <title>MealPlanner</title>
   <link rel="stylesheet" href="/static/style.css" />
 </head>
 <body>
   <div class="top-accent-bar"></div>
   {% if current_user %}
   <div class="top-bar">
-    <div class="top-bar-brand">🍽️ CookHelper</div>
+    <div class="top-bar-brand">🍽️ MealPlanner</div>
     <div class="avatar avatar-sm">{{ current_user.username[0]|upper }}</div>
   </div>
   <nav class="tab-pills">
