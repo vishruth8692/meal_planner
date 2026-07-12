@@ -2,25 +2,32 @@
 {% block content %}
 <h1>Dish Catalog</h1>
 
-<div class="card">
-  <table>
-    <tr><th></th><th>Name</th><th>Diet</th><th>Region</th><th>Protein</th><th>Nutrition</th><th>Meal</th><th>Recipe</th><th>Active</th><th></th></tr>
-    {% for d in dishes %}
-    <tr>
-      <td>{% if d.image_url %}<img class="dish-thumb" src="{{ d.image_url }}" alt="" />{% else %}<span class="dish-thumb-emoji">{{ dish_emoji(d) }}</span>{% endif %}</td>
-      <td>{{ d.name }}{% if d.is_special %} <span class="tag special-tag">Sunday special</span>{% endif %}</td>
-      <td>{{ d.diet.value }}</td>
-      <td>{{ d.region.value }}</td>
-      <td>{{ d.protein_source or "" }}</td>
-      <td>{% if d.protein_grams %}{{ d.protein_grams|round|int }}g{% endif %}{% if d.protein_grams and d.calories %} / {% endif %}{% if d.calories %}{{ d.calories }} kcal{% endif %}</td>
-      <td>{{ d.meal_type.value }}</td>
-      <td>{% if d.recipe_url %}<a href="{{ d.recipe_url }}" target="_blank">link</a>{% endif %}</td>
-      <td>{{ "Yes" if d.active else "No" }}</td>
-      <td><form method="post" action="/dishes/{{ d.id }}/toggle"><button class="secondary" type="submit">{{ "Disable" if d.active else "Enable" }}</button></form></td>
-    </tr>
-    {% endfor %}
-  </table>
+<form method="get" action="/dishes">
+  <input class="search-input" type="text" name="q" value="{{ q }}" placeholder="Search dishes…" />
+  <input type="hidden" name="diet" value="{{ diet }}" />
+</form>
+<div class="filter-chips">
+  {% for value, label in [("all", "All"), ("veg", "Veg"), ("non_veg", "Non-veg"), ("egg", "Egg")] %}
+  <a class="filter-chip {{ 'active' if diet == value else '' }}" href="/dishes?diet={{ value }}{% if q %}&q={{ q }}{% endif %}">{{ label }}</a>
+  {% endfor %}
 </div>
+
+{% for d in dishes %}
+<div class="card" style="display: flex; align-items: center; gap: 12px; padding: 12px 14px;">
+  <div class="alt-visual">{% if d.image_url %}<img src="{{ d.image_url }}" alt="" />{% else %}{{ dish_emoji(d) }}{% endif %}</div>
+  <div style="flex: 1; min-width: 0;">
+    <div style="font-size: 14.5px; font-weight: 700;">{{ d.name }}{% if d.is_special %} <span class="tag special-tag">Sunday special</span>{% endif %}</div>
+    <div class="hint" style="margin: 2px 0 0;">
+      {{ d.diet.value }} &middot; {% if d.protein_grams %}{{ d.protein_grams|round|int }}g{% endif %}{% if d.calories %} / {{ d.calories }} kcal{% endif %} &middot; {{ d.meal_type.value }} &middot; {{ d.region.value }}{% if d.recipe_url %} &middot; <a href="{{ d.recipe_url }}" target="_blank">recipe</a>{% endif %}
+    </div>
+  </div>
+  <form method="post" action="/dishes/{{ d.id }}/toggle" style="margin: 0;">
+    <button type="submit" style="background: none; border: none; padding: 0; font-size: 11.5px; font-weight: 700; color: {{ 'var(--danger-text-strong)' if d.active else 'var(--selected-border)' }}; cursor: pointer;">{{ "Disable" if d.active else "Enable" }}</button>
+  </form>
+</div>
+{% else %}
+<div class="card"><p class="hint">No dishes match your search.</p></div>
+{% endfor %}
 
 <div class="card">
   <h2>Add dish</h2>

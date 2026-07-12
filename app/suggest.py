@@ -58,6 +58,11 @@ def _out_of_stock_names(session: Session, owner_id: int) -> set[str]:
     return {o.ingredient_name.strip().lower() for o in items}
 
 
+def get_out_of_stock_names(session: Session, owner_id: int) -> set[str]:
+    """Public entry point for callers (e.g. the dashboard) that just need the current out-of-stock set."""
+    return _out_of_stock_names(session, owner_id)
+
+
 def _has_out_of_stock_ingredient(dish: Dish, out_of_stock: set[str]) -> bool:
     if not dish.ingredients or not out_of_stock:
         return False

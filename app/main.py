@@ -25,7 +25,13 @@ from app.models import (
     User,
 )
 from app.seed import seed_starter_dishes
-from app.suggest import OUT_OF_STOCK_EXPIRY_DAYS, get_candidates, get_special_candidates, plan_week
+from app.suggest import (
+    OUT_OF_STOCK_EXPIRY_DAYS,
+    get_candidates,
+    get_out_of_stock_names,
+    get_special_candidates,
+    plan_week,
+)
 from app.visuals import dish_emoji
 
 app = FastAPI(title="CookHelper")
@@ -152,7 +158,7 @@ def save_preferences(
     request: Request,
     cuisine_preference: str = Form("universal"),
     household_diet: str = Form("veg"),
-    repeat_gap_days: int = Form(3),
+    repeat_gap_days: int = Form(7),
     session: Session = Depends(get_session),
 ):
     user = _current_user(request, session)
@@ -167,6 +173,13 @@ def save_preferences(
 
 
 # ---------- dashboard ----------
+
+MEAL_FIELDS = {
+    "breakfast": "breakfast_dish_id",
+    "lunch": "lunch_dish_id",
+    "dinner": "dinner_dish_id",
+    "sunday_special": "sunday_special_dish_id",
+}
 
 
 def _get_or_create_menu(session: Session, owner_id: int, target_date: date) -> DailyMenu:
@@ -199,22 +212,43 @@ def _whatsapp_text(
     return "\n".join(lines)
 
 
-def _candidates_with_selection(
+def _build_meal_view(
     session: Session,
     owner_id: int,
-    meal_type: MealType,
+    meal_key: str,
+    meal_type: Optional[MealType],
     chosen: Optional[Dish],
     exclude_dish_ids: set[int],
     today: date,
-) -> list[Dish]:
-    """Candidate list for a meal slot, guaranteed to include the currently chosen dish (if any) so it's
-    always visible and highlighted rather than hidden once picked."""
-    candidates = get_candidates(
-        session, owner_id, meal_type, count=3, exclude_dish_ids=exclude_dish_ids, target_date=today
-    )
-    if chosen and chosen.id not in {c.id for c in candidates}:
-        candidates = [chosen] + candidates
-    return candidates
+) -> dict:
+    """One recommended pick per meal, shown prominently, with a small list of alternatives below —
+    not several equally-weighted candidates."""
+    if chosen:
+        alt_count = 2
+        exclude = exclude_dish_ids | {chosen.id}
+    else:
+        alt_count = 3
+        exclude = exclude_dish_ids
+
+    if meal_type is None:  # sunday_special
+        alternatives = get_special_candidates(session, owner_id, count=alt_count, exclude_dish_ids=exclude, target_date=today)
+    else:
+        alternatives = get_candidates(session, owner_id, meal_type, count=alt_count, exclude_dish_ids=exclude, target_date=today)
+
+    labels = {
+        "breakfast": ("Breakfast", True),
+        "lunch": ("Lunch", False),
+        "dinner": ("Dinner", False),
+        "sunday_special": ("Sunday Special — veg treat", True),
+    }
+    label, optional = labels[meal_key]
+    return {"key": meal_key, "label": label, "optional": optional, "chosen": chosen, "alternatives": alternatives}
+
+
+def _dish_uses_ingredient(dish: Optional[Dish], ingredient_name: str) -> bool:
+    if not dish or not dish.ingredients:
+        return False
+    return ingredient_name in {i.strip().lower() for i in dish.ingredients.split(",")}
 
 
 @app.get("/")
@@ -232,25 +266,31 @@ def dashboard(request: Request, session: Session = Depends(get_session)):
     lunch = session.get(Dish, menu.lunch_dish_id) if menu.lunch_dish_id else None
     dinner = session.get(Dish, menu.dinner_dish_id) if menu.dinner_dish_id else None
 
-    breakfast_candidates = _candidates_with_selection(session, user.id, MealType.breakfast, breakfast, set(), today)
-    lunch_candidates = _candidates_with_selection(session, user.id, MealType.lunch, lunch, set(), today)
-    exclude_for_dinner = {lunch.id} if lunch else set()
-    dinner_candidates = _candidates_with_selection(
-        session, user.id, MealType.dinner, dinner, exclude_for_dinner, today
-    )
-
     is_sunday = today.weekday() == 6
     sunday_special = session.get(Dish, menu.sunday_special_dish_id) if menu.sunday_special_dish_id else None
-    sunday_special_candidates: list[Dish] = []
+
+    breakfast_view = _build_meal_view(session, user.id, "breakfast", MealType.breakfast, breakfast, set(), today)
+    lunch_view = _build_meal_view(session, user.id, "lunch", MealType.lunch, lunch, set(), today)
+    exclude_for_dinner = {lunch.id} if lunch else set()
+    dinner_view = _build_meal_view(session, user.id, "dinner", MealType.dinner, dinner, exclude_for_dinner, today)
+    sunday_special_view = None
     if is_sunday:
-        sunday_special_candidates = get_special_candidates(session, user.id, count=3, target_date=today)
-        if sunday_special and sunday_special.id not in {c.id for c in sunday_special_candidates}:
-            sunday_special_candidates = [sunday_special] + sunday_special_candidates
+        sunday_special_view = _build_meal_view(session, user.id, "sunday_special", None, sunday_special, set(), today)
 
     all_dishes = session.exec(
         select(Dish).where(Dish.owner_id == user.id, Dish.active == True).order_by(Dish.name)  # noqa: E712
     ).all()
     whatsapp_text = _whatsapp_text(menu, breakfast, lunch, dinner, sunday_special) if (lunch and dinner) else ""
+
+    out_of_stock_names = get_out_of_stock_names(session, user.id)
+
+    totals = {"protein": 0, "kcal": 0}
+    for dish in (breakfast, lunch, dinner, sunday_special):
+        if dish:
+            totals["protein"] += round(dish.protein_grams or 0)
+            totals["kcal"] += dish.calories or 0
+
+    swap_notices = request.session.pop("flash_swaps", {})
 
     return render(
         request,
@@ -258,18 +298,16 @@ def dashboard(request: Request, session: Session = Depends(get_session)):
         "index.html",
         {
             "menu": menu,
-            "breakfast": breakfast,
+            "meals": [breakfast_view, lunch_view, dinner_view] + ([sunday_special_view] if sunday_special_view else []),
             "lunch": lunch,
             "dinner": dinner,
-            "breakfast_candidates": breakfast_candidates,
-            "lunch_candidates": lunch_candidates,
-            "dinner_candidates": dinner_candidates,
             "is_sunday": is_sunday,
-            "sunday_special": sunday_special,
-            "sunday_special_candidates": sunday_special_candidates,
             "all_dishes": all_dishes,
             "whatsapp_text": whatsapp_text,
             "today": today,
+            "out_of_stock_names": out_of_stock_names,
+            "totals": totals,
+            "swap_notices": swap_notices,
         },
     )
 
@@ -282,15 +320,15 @@ def week_view(request: Request, session: Session = Depends(get_session)):
     if not session.exec(select(FamilyMember).where(FamilyMember.owner_id == user.id)).first():
         return RedirectResponse("/profile", status_code=303)
     plan = plan_week(session, user.id)
-    return render(request, user, "week.html", {"plan": plan})
+    today = date.today()
 
+    def day_totals(day_plan: dict) -> dict:
+        protein = sum(round(d.protein_grams or 0) for d in day_plan.values() if d)
+        kcal = sum((d.calories or 0) for d in day_plan.values() if d)
+        return {"protein": protein, "kcal": kcal}
 
-MEAL_FIELDS = {
-    "breakfast": "breakfast_dish_id",
-    "lunch": "lunch_dish_id",
-    "dinner": "dinner_dish_id",
-    "sunday_special": "sunday_special_dish_id",
-}
+    plan_with_totals = [(day, day_plan, day_totals(day_plan)) for day, day_plan in plan]
+    return render(request, user, "week.html", {"plan": plan_with_totals, "today": today})
 
 
 @app.post("/menu/select")
@@ -327,14 +365,55 @@ def change_dish(request: Request, meal: str = Form(...), session: Session = Depe
     return RedirectResponse("/", status_code=303)
 
 
-def _dish_uses_ingredient(dish: Optional[Dish], ingredient_name: str) -> bool:
-    if not dish or not dish.ingredients:
-        return False
-    return ingredient_name in {i.strip().lower() for i in dish.ingredients.split(",")}
+def _mark_out_of_stock_and_swap(session: Session, user: User, name: str) -> dict[str, str]:
+    """Marks an ingredient out of stock (no-op if already marked) and, if it breaks any of today's
+    current picks, auto-swaps that meal to the next available alternative — returning a note per meal
+    describing the swap so the UI can surface it once."""
+    existing = session.exec(
+        select(OutOfStockIngredient).where(
+            OutOfStockIngredient.owner_id == user.id, OutOfStockIngredient.ingredient_name == name
+        )
+    ).first()
+    if existing:
+        return {}
+    session.add(OutOfStockIngredient(owner_id=user.id, ingredient_name=name, flagged_on=date.today()))
+    session.commit()
+
+    today = date.today()
+    menu = session.exec(select(DailyMenu).where(DailyMenu.owner_id == user.id, DailyMenu.menu_date == today)).first()
+    if not menu:
+        return {}
+
+    swap_notices: dict[str, str] = {}
+    changed = False
+    for meal_key, field in MEAL_FIELDS.items():
+        dish_id = getattr(menu, field)
+        if not dish_id:
+            continue
+        dish = session.get(Dish, dish_id)
+        if not _dish_uses_ingredient(dish, name):
+            continue
+        if meal_key == "sunday_special":
+            alt = get_special_candidates(session, user.id, count=1, exclude_dish_ids={dish_id}, target_date=today)
+        else:
+            alt = get_candidates(
+                session, user.id, MealType(meal_key), count=1, exclude_dish_ids={dish_id}, target_date=today
+            )
+        if alt:
+            setattr(menu, field, alt[0].id)
+            swap_notices[meal_key] = f"{dish.name} needs {name} — switched to {alt[0].name}"
+        else:
+            setattr(menu, field, None)
+            swap_notices[meal_key] = f"{dish.name} needs {name} — no available alternative right now"
+        changed = True
+    if changed:
+        menu.status = MenuStatus.draft
+        session.commit()
+    return swap_notices
 
 
-@app.post("/menu/mark_unavailable")
-def mark_unavailable(request: Request, ingredient_name: str = Form(...), session: Session = Depends(get_session)):
+@app.post("/menu/toggle_ingredient")
+def toggle_ingredient(request: Request, ingredient_name: str = Form(...), session: Session = Depends(get_session)):
     user = _current_user(request, session)
     if not user:
         return RedirectResponse("/login", status_code=303)
@@ -344,24 +423,13 @@ def mark_unavailable(request: Request, ingredient_name: str = Form(...), session
             OutOfStockIngredient.owner_id == user.id, OutOfStockIngredient.ingredient_name == name
         )
     ).first()
-    if not existing:
-        session.add(OutOfStockIngredient(owner_id=user.id, ingredient_name=name, flagged_on=date.today()))
+    if existing:
+        session.delete(existing)
         session.commit()
-
-    # if today's selected dish for any meal used this ingredient, clear it so fresh candidates show
-    today = date.today()
-    menu = session.exec(
-        select(DailyMenu).where(DailyMenu.owner_id == user.id, DailyMenu.menu_date == today)
-    ).first()
-    if menu:
-        changed = False
-        for field in MEAL_FIELDS.values():
-            dish_id = getattr(menu, field)
-            if dish_id and _dish_uses_ingredient(session.get(Dish, dish_id), name):
-                setattr(menu, field, None)
-                changed = True
-        if changed:
-            session.commit()
+    else:
+        swap_notices = _mark_out_of_stock_and_swap(session, user, name)
+        if swap_notices:
+            request.session["flash_swaps"] = swap_notices
     return RedirectResponse("/", status_code=303)
 
 
@@ -438,12 +506,17 @@ def delete_member(request: Request, member_id: int, session: Session = Depends(g
 
 
 @app.get("/dishes")
-def dishes(request: Request, session: Session = Depends(get_session)):
+def dishes(request: Request, q: str = "", diet: str = "all", session: Session = Depends(get_session)):
     user = _current_user(request, session)
     if not user:
         return RedirectResponse("/login", status_code=303)
-    all_dishes = session.exec(select(Dish).where(Dish.owner_id == user.id).order_by(Dish.name)).all()
-    return render(request, user, "dishes.html", {"dishes": all_dishes})
+    query = select(Dish).where(Dish.owner_id == user.id)
+    if diet != "all":
+        query = query.where(Dish.diet == DietType(diet))
+    if q:
+        query = query.where(Dish.name.ilike(f"%{q}%"))
+    all_dishes = session.exec(query.order_by(Dish.name)).all()
+    return render(request, user, "dishes.html", {"dishes": all_dishes, "q": q, "diet": diet})
 
 
 @app.post("/dishes/add")
@@ -521,14 +594,9 @@ def add_out_of_stock(request: Request, ingredient_name: str = Form(...), session
     if not user:
         return RedirectResponse("/login", status_code=303)
     name = ingredient_name.strip().lower()
-    existing = session.exec(
-        select(OutOfStockIngredient).where(
-            OutOfStockIngredient.owner_id == user.id, OutOfStockIngredient.ingredient_name == name
-        )
-    ).first()
-    if not existing:
-        session.add(OutOfStockIngredient(owner_id=user.id, ingredient_name=name, flagged_on=date.today()))
-        session.commit()
+    swap_notices = _mark_out_of_stock_and_swap(session, user, name)
+    if swap_notices:
+        request.session["flash_swaps"] = swap_notices
     return RedirectResponse("/pantry", status_code=303)
 
 

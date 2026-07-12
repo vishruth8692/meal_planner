@@ -1,95 +1,87 @@
 {% extends "base.html" %}
 {% block content %}
-<h1>Today's Menu — {{ today.strftime('%A, %d %b') }}</h1>
+<h1>{{ today.strftime('%A, %d %b') }}</h1>
+
+{% if totals.protein or totals.kcal %}
+<div class="totals-pill">&check; {{ totals.protein }}g protein &middot; {{ totals.kcal }} kcal so far</div>
+{% endif %}
 
 {% if is_sunday %}
-<div class="card onboarding">
-  It's Sunday! Lunch and dinner suggestions favor a non-veg option, and there's a Sunday Special veg pick below for everyone else.
-</div>
+<p class="hint">It's Sunday — lunch &amp; dinner lean non-veg for households that eat it, and there's a veg Sunday Special offered separately below.</p>
 {% endif %}
 
-{% macro nutrition(dish) %}
-{% if dish.protein_grams or dish.calories %}
-<span class="nutrition">
-  {% if dish.protein_grams %}{{ dish.protein_grams|round|int }}g protein{% endif %}{% if dish.protein_grams and dish.calories %} &middot; {% endif %}{% if dish.calories %}{{ dish.calories }} kcal{% endif %}
-</span>
-{% endif %}
-{% endmacro %}
-
-{% macro ingredient_tags(dish) %}
-{% if dish.ingredients %}
-<div class="ingredients">
-  {% for ing in dish.ingredients.split(',') %}
-  <form method="post" action="/menu/mark_unavailable" class="ing-form">
-    <input type="hidden" name="ingredient_name" value="{{ ing.strip() }}" />
-    <button type="submit" class="ing-tag" title="Mark '{{ ing.strip() }}' as unavailable">{{ ing.strip() }} &times;</button>
-  </form>
-  {% endfor %}
-</div>
-{% endif %}
-{% endmacro %}
-
-{% macro meal_section(meal_key, meal_label, chosen, candidates) %}
+{% for meal in meals %}
 <div class="card">
-  <h2>{{ meal_label }}</h2>
+  <div class="meal-title-row">
+    <h2>{{ meal.label }}</h2>
+    {% if meal.optional %}<span class="optional-pill">optional</span>{% endif %}
+  </div>
 
-  {% if candidates %}
-    <p class="hint">Tap "Choose this" on any dish to select it — tapping another one swaps it instantly. Tap an ingredient to mark it unavailable.</p>
-    <div class="candidates">
-      {% for dish in candidates %}
-      {% set is_selected = chosen and dish.id == chosen.id %}
-      <div class="candidate {{ 'selected' if is_selected else '' }}">
-        <div class="candidate-visual">
-          {% if dish.image_url %}<img src="{{ dish.image_url }}" alt="" />{% else %}<span class="candidate-emoji">{{ dish_emoji(dish) }}</span>{% endif %}
-        </div>
-        <div class="candidate-body">
-          <div class="candidate-name">
-            {{ dish.name }}{% if dish.protein_source %} <span class="tag">{{ dish.protein_source }}</span>{% endif %}
-            {% if is_selected %}<span class="selected-badge">&check; Selected</span>{% endif %}
-          </div>
-          {{ nutrition(dish) }}
-          {{ ingredient_tags(dish) }}
-          {% if dish.recipe_url %}<a href="{{ dish.recipe_url }}" target="_blank">recipe</a>{% endif %}
-          {% if is_selected %}
-          <form method="post" action="/menu/change">
-            <input type="hidden" name="meal" value="{{ meal_key }}" />
-            <button class="secondary" type="submit">Remove</button>
-          </form>
-          {% else %}
-          <form method="post" action="/menu/select">
-            <input type="hidden" name="meal" value="{{ meal_key }}" />
-            <input type="hidden" name="dish_id" value="{{ dish.id }}" />
-            <button type="submit">Choose this</button>
-          </form>
-          {% endif %}
+  {% if swap_notices.get(meal.key) %}
+  <div class="swap-notice">&#128260; {{ swap_notices[meal.key] }}</div>
+  {% endif %}
+
+  {% if meal.chosen %}
+  <div class="current-pick">
+    <div class="current-pick-row">
+      <div class="current-pick-visual">
+        {% if meal.chosen.image_url %}<img src="{{ meal.chosen.image_url }}" alt="" />{% else %}{{ dish_emoji(meal.chosen) }}{% endif %}
+      </div>
+      <div style="flex: 1; min-width: 0;">
+        <div class="selected-badge">SELECTED</div>
+        <div class="current-pick-name">{{ meal.chosen.name }}</div>
+        <div class="current-pick-meta">
+          {% if meal.chosen.protein_grams %}{{ meal.chosen.protein_grams|round|int }}g protein &middot; {% endif %}{% if meal.chosen.calories %}{{ meal.chosen.calories }} kcal &middot; {% endif %}{{ meal.chosen.protein_source or meal.chosen.diet.value }}
         </div>
       </div>
+    </div>
+    {% if meal.chosen.ingredients %}
+    <div class="ingredients">
+      {% for ing in meal.chosen.ingredients.split(',') %}
+      {% set ing_name = ing.strip() %}
+      {% set is_out = ing_name.lower() in out_of_stock_names %}
+      <form method="post" action="/menu/toggle_ingredient" class="ing-form">
+        <input type="hidden" name="ingredient_name" value="{{ ing_name }}" />
+        <button type="submit" class="ing-tag {{ 'out-of-stock' if is_out else '' }}">{{ ing_name }}{% if is_out %} &times;{% endif %}</button>
+      </form>
       {% endfor %}
     </div>
-    <details>
-      <summary>Choose a different dish instead</summary>
-      <form method="post" action="/menu/select">
-        <input type="hidden" name="meal" value="{{ meal_key }}" />
-        <select name="dish_id">
-          {% for d in all_dishes %}
-          <option value="{{ d.id }}">{{ d.name }}</option>
-          {% endfor %}
-        </select>
-        <button class="secondary" type="submit">Select</button>
-      </form>
-    </details>
+    <div class="current-pick-caption">Tap an ingredient if it's out of stock — we'll swap the meal.</div>
+    {% endif %}
+    {% if meal.optional %}
+    <form method="post" action="/menu/change" style="margin-top: 10px;">
+      <input type="hidden" name="meal" value="{{ meal.key }}" />
+      <button type="submit" class="secondary">Remove</button>
+    </form>
+    {% endif %}
+  </div>
   {% else %}
-    <p class="hint">No eligible dishes right now — check <a href="/pantry">Pantry</a> or <a href="/dishes">Dishes</a>.</p>
+  <div class="empty-state">Not added today — pick one below</div>
+  {% endif %}
+
+  {% if meal.alternatives %}
+  <div class="other-options-label">Other options</div>
+  <div class="alt-rows">
+    {% for alt in meal.alternatives %}
+    <div class="alt-row">
+      <div class="alt-visual">{% if alt.image_url %}<img src="{{ alt.image_url }}" alt="" />{% else %}{{ dish_emoji(alt) }}{% endif %}</div>
+      <div class="alt-body">
+        <div class="alt-name">{{ alt.name }}</div>
+        <div class="alt-meta">{% if alt.protein_grams %}{{ alt.protein_grams|round|int }}g protein &middot; {% endif %}{% if alt.calories %}{{ alt.calories }} kcal{% endif %}</div>
+      </div>
+      <form method="post" action="/menu/select">
+        <input type="hidden" name="meal" value="{{ meal.key }}" />
+        <input type="hidden" name="dish_id" value="{{ alt.id }}" />
+        <button type="submit" class="alt-action">Choose</button>
+      </form>
+    </div>
+    {% endfor %}
+  </div>
+  {% elif not meal.chosen %}
+  <p class="hint">No eligible dishes right now — check <a href="/pantry">Pantry</a> or <a href="/dishes">Dishes</a>.</p>
   {% endif %}
 </div>
-{% endmacro %}
-
-{{ meal_section("breakfast", "Breakfast (optional)", breakfast, breakfast_candidates) }}
-{{ meal_section("lunch", "Lunch", lunch, lunch_candidates) }}
-{{ meal_section("dinner", "Dinner", dinner, dinner_candidates) }}
-{% if is_sunday %}
-{{ meal_section("sunday_special", "Sunday Special — veg treat (optional)", sunday_special, sunday_special_candidates) }}
-{% endif %}
+{% endfor %}
 
 {% if lunch and dinner %}
 <div class="card">

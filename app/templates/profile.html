@@ -18,21 +18,20 @@
 {% endif %}
 
 {% if members %}
-<div class="card">
-  <h2>Members</h2>
-  <table>
-    <tr><th>Name</th><th>Kid?</th><th>High protein</th><th>Restrictions</th><th></th></tr>
-    {% for m in members %}
-    <tr>
-      <td>{{ m.name }}</td>
-      <td>{{ "Yes" if m.is_kid else "No" }}</td>
-      <td>{{ "Yes" if m.high_protein_focus else "No" }}</td>
-      <td>{{ m.restrictions or "" }}</td>
-      <td><form method="post" action="/profile/member/{{ m.id }}/delete"><button class="secondary" type="submit">Remove</button></form></td>
-    </tr>
-    {% endfor %}
-  </table>
+{% for m in members %}
+<div class="card member-row">
+  <div class="avatar">{{ m.name[0]|upper }}</div>
+  <div style="flex: 1; min-width: 0;">
+    <div style="font-size: 15px; font-weight: 700;">{{ m.name }}</div>
+    <div class="hint" style="margin: 2px 0 0;">
+      {{ "Kid" if m.is_kid else "Adult" }}{% if m.high_protein_focus %} &middot; High protein focus{% endif %}{% if m.restrictions %} &middot; {{ m.restrictions }}{% endif %}
+    </div>
+  </div>
+  <form method="post" action="/profile/member/{{ m.id }}/delete" style="margin: 0;">
+    <button type="submit" style="background: none; border: none; padding: 0; font-size: 12px; font-weight: 700; color: var(--danger-text-strong); cursor: pointer;">Remove</button>
+  </form>
 </div>
+{% endfor %}
 {% endif %}
 
 <div class="card add-member-card">

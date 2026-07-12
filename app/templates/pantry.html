@@ -1,27 +1,32 @@
 {% extends "base.html" %}
 {% block content %}
-<h1>Pantry — items currently out of stock</h1>
-<p>Dishes needing any of these ingredients are skipped when suggesting menus. Items automatically come back in stock after {{ expiry_days }} days unless you remove them sooner.</p>
+<h1>Pantry</h1>
+<p class="hint">Dishes needing these ingredients are skipped. Anything you flag here or on Today shows up in both places. Items auto-restock after {{ expiry_days }} days.</p>
 
-<div class="card">
-  <table>
-    <tr><th>Ingredient</th><th>Flagged</th><th>Auto-restocks</th><th></th></tr>
-    {% for i in items %}
-    {% set days_left = expiry_days - (today - i.flagged_on).days %}
-    <tr>
-      <td>{{ i.ingredient_name }}</td>
-      <td>{{ i.flagged_on.strftime('%d %b') }}</td>
-      <td>{% if days_left <= 0 %}today{% else %}in {{ days_left }} day{{ 's' if days_left != 1 else '' }}{% endif %}</td>
-      <td><form method="post" action="/pantry/{{ i.id }}/delete"><button class="secondary" type="submit">Back in stock</button></form></td>
-    </tr>
-    {% endfor %}
-  </table>
+{% for i in items %}
+{% set days_left = expiry_days - (today - i.flagged_on).days %}
+<div class="card" style="border-color: var(--danger-border); display: flex; align-items: center; gap: 12px;">
+  <div style="flex: 1; min-width: 0;">
+    <div style="font-size: 14.5px; font-weight: 700; text-transform: capitalize;">{{ i.ingredient_name }}</div>
+    <div class="hint" style="margin: 2px 0 0;">
+      Flagged {{ i.flagged_on.strftime('%d %b') }} &middot; auto-restocks {% if days_left <= 0 %}today{% else %}in {{ days_left }} day{{ 's' if days_left != 1 else '' }}{% endif %}
+    </div>
+  </div>
+  <form method="post" action="/pantry/{{ i.id }}/delete" style="margin: 0;">
+    <button type="submit" style="background: none; border: none; padding: 0; font-size: 12px; font-weight: 700; color: var(--selected-border); cursor: pointer;">Back in stock</button>
+  </form>
 </div>
+{% else %}
+<div class="card" style="border-style: dashed; text-align: center; color: var(--text-faint); font-size: 13.5px;">
+  Nothing out of stock — tap an ingredient chip on Today to flag it here.
+</div>
+{% endfor %}
 
 <div class="card">
+  <h2>Mark ingredient as out of stock</h2>
   <form method="post" action="/pantry/add">
-    <label>Mark ingredient as out of stock <input type="text" name="ingredient_name" required placeholder="e.g. paneer" /></label>
-    <button type="submit">Add</button>
+    <input type="text" name="ingredient_name" required placeholder="e.g. paneer" />
+    <button type="submit" style="margin-top: 12px;">Add</button>
   </form>
 </div>
 {% endblock %}
