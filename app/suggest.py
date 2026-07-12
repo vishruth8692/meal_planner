@@ -6,6 +6,7 @@ from sqlmodel import Session, select
 
 from app.models import (
     CookedLog,
+    CuisineRegion,
     Dish,
     DietType,
     HouseholdSettings,
@@ -70,6 +71,12 @@ def _fits_meal(dish_meal_type: MealType, meal_type: MealType) -> bool:
     return False
 
 
+def _fits_region(dish_region: CuisineRegion, preference: CuisineRegion) -> bool:
+    if preference == CuisineRegion.universal or dish_region == CuisineRegion.universal:
+        return True
+    return dish_region == preference
+
+
 def _eligible_dishes(
     session: Session,
     owner_id: int,
@@ -88,6 +95,8 @@ def _eligible_dishes(
         if dish.id in exclude_ids:
             continue
         if not _fits_meal(dish.meal_type, meal_type):
+            continue
+        if not _fits_region(dish.region, settings.cuisine_preference):
             continue
         if dish.diet == DietType.non_veg and not settings.allow_non_veg:
             continue
@@ -162,6 +171,8 @@ def get_special_candidates(
     eligible = []
     for dish in dishes:
         if dish.id in exclude or dish.diet == DietType.non_veg:
+            continue
+        if not _fits_region(dish.region, settings.cuisine_preference):
             continue
         if _has_out_of_stock_ingredient(dish, out_of_stock):
             continue

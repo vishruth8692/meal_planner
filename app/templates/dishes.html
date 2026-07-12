@@ -4,11 +4,13 @@
 
 <div class="card">
   <table>
-    <tr><th>Name</th><th>Diet</th><th>Protein</th><th>Nutrition</th><th>Meal</th><th>Recipe</th><th>Active</th><th></th></tr>
+    <tr><th></th><th>Name</th><th>Diet</th><th>Region</th><th>Protein</th><th>Nutrition</th><th>Meal</th><th>Recipe</th><th>Active</th><th></th></tr>
     {% for d in dishes %}
     <tr>
+      <td>{% if d.image_url %}<img class="dish-thumb" src="{{ d.image_url }}" alt="" />{% else %}<span class="dish-thumb-emoji">{{ dish_emoji(d) }}</span>{% endif %}</td>
       <td>{{ d.name }}{% if d.is_special %} <span class="tag special-tag">Sunday special</span>{% endif %}</td>
       <td>{{ d.diet.value }}</td>
+      <td>{{ d.region.value }}</td>
       <td>{{ d.protein_source or "" }}</td>
       <td>{% if d.protein_grams %}{{ d.protein_grams|round|int }}g{% endif %}{% if d.protein_grams and d.calories %} / {% endif %}{% if d.calories %}{{ d.calories }} kcal{% endif %}</td>
       <td>{{ d.meal_type.value }}</td>
@@ -47,6 +49,15 @@
     </label>
     <label>Ingredients (comma separated) <input type="text" name="ingredients" placeholder="e.g. paneer, tomato, onion" /></label>
     <label>Recipe URL (optional) <input type="url" name="recipe_url" placeholder="https://youtube.com/..." /></label>
+    <label>Photo URL (optional — shows an emoji if left blank) <input type="url" name="image_url" placeholder="https://..." /></label>
+    <label>
+      Region
+      <select name="region">
+        <option value="universal">Both / no preference</option>
+        <option value="north">North Indian</option>
+        <option value="south">South Indian</option>
+      </select>
+    </label>
     <label><input type="checkbox" name="is_special" /> Sunday special (elaborate veg treat, only suggested on Sundays)</label>
     <button type="submit">Add dish</button>
   </form>

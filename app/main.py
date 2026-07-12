@@ -13,6 +13,7 @@ from app.auth import hash_password, verify_password
 from app.database import get_session, init_db
 from app.models import (
     CookedLog,
+    CuisineRegion,
     DailyMenu,
     Dish,
     DietType,
@@ -25,11 +26,13 @@ from app.models import (
 )
 from app.seed import seed_starter_dishes
 from app.suggest import OUT_OF_STOCK_EXPIRY_DAYS, get_candidates, get_special_candidates, plan_week
+from app.visuals import dish_emoji
 
 app = FastAPI(title="CookHelper")
 app.add_middleware(SessionMiddleware, secret_key=os.environ.get("SECRET_KEY", "dev-only-insecure-secret"))
 app.mount("/static", StaticFiles(directory="app/static"), name="static")
 templates = Jinja2Templates(directory="app/templates")
+templates.env.globals["dish_emoji"] = dish_emoji
 
 
 @app.on_event("startup")
@@ -62,6 +65,7 @@ def signup(
     request: Request,
     username: str = Form(...),
     password: str = Form(...),
+    cuisine_preference: str = Form("universal"),
     session: Session = Depends(get_session),
 ):
     username = username.strip().lower()
@@ -78,6 +82,8 @@ def signup(
     session.commit()
     session.refresh(user)
     seed_starter_dishes(session, user.id)
+    session.add(HouseholdSettings(owner_id=user.id, cuisine_preference=CuisineRegion(cuisine_preference)))
+    session.commit()
 
     request.session["user_id"] = user.id
     return RedirectResponse("/profile", status_code=303)
@@ -390,6 +396,7 @@ def update_settings(
     request: Request,
     allow_non_veg: bool = Form(False),
     repeat_gap_days: int = Form(3),
+    cuisine_preference: str = Form("universal"),
     session: Session = Depends(get_session),
 ):
     user = _current_user(request, session)
@@ -401,6 +408,7 @@ def update_settings(
         session.add(settings)
     settings.allow_non_veg = allow_non_veg
     settings.repeat_gap_days = repeat_gap_days
+    settings.cuisine_preference = CuisineRegion(cuisine_preference)
     session.commit()
     return RedirectResponse("/profile", status_code=303)
 
@@ -428,7 +436,9 @@ def add_dish(
     meal_type: str = Form("any"),
     ingredients: str = Form(""),
     recipe_url: str = Form(""),
+    image_url: str = Form(""),
     is_special: bool = Form(False),
+    region: str = Form("universal"),
     session: Session = Depends(get_session),
 ):
     user = _current_user(request, session)
@@ -444,7 +454,9 @@ def add_dish(
         meal_type=MealType(meal_type),
         ingredients=ingredients or None,
         recipe_url=recipe_url or None,
+        image_url=image_url or None,
         is_special=is_special,
+        region=CuisineRegion(region),
     )
     session.add(dish)
     session.commit()

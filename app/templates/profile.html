@@ -23,6 +23,14 @@
       Don't repeat a dish within (days)
       <input type="number" name="repeat_gap_days" value="{{ settings.repeat_gap_days }}" min="0" />
     </label>
+    <label>
+      Cuisine preference
+      <select name="cuisine_preference">
+        <option value="universal" {% if settings.cuisine_preference.value == "universal" %}selected{% endif %}>Both / no preference</option>
+        <option value="north" {% if settings.cuisine_preference.value == "north" %}selected{% endif %}>North Indian</option>
+        <option value="south" {% if settings.cuisine_preference.value == "south" %}selected{% endif %}>South Indian</option>
+      </select>
+    </label>
     <button type="submit">Save settings</button>
   </form>
 </div>

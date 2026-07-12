@@ -24,6 +24,12 @@ class MenuStatus(str, Enum):
     approved = "approved"
 
 
+class CuisineRegion(str, Enum):
+    north = "north"
+    south = "south"
+    universal = "universal"  # as a dish tag: fits either region; as a preference: no restriction
+
+
 class User(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
     username: str = Field(unique=True, index=True)
@@ -46,6 +52,7 @@ class HouseholdSettings(SQLModel, table=True):
     owner_id: int = Field(foreign_key="user.id", unique=True, index=True)
     allow_non_veg: bool = False
     repeat_gap_days: int = 3  # don't repeat a dish within this many days
+    cuisine_preference: CuisineRegion = CuisineRegion.universal
 
 
 class Dish(SQLModel, table=True):
@@ -61,6 +68,8 @@ class Dish(SQLModel, table=True):
     recipe_url: Optional[str] = None
     active: bool = True
     is_special: bool = False  # elaborate/festive dish, surfaced for the Sunday veg special
+    region: CuisineRegion = CuisineRegion.universal
+    image_url: Optional[str] = None
 
 
 class CookedLog(SQLModel, table=True):
