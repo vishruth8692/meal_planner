@@ -2,6 +2,12 @@
 {% block content %}
 <h1>Today's Menu — {{ today.strftime('%A, %d %b') }}</h1>
 
+{% if is_sunday %}
+<div class="card onboarding">
+  It's Sunday! Lunch and dinner suggestions favor a non-veg option, and there's a Sunday Special veg pick below for everyone else.
+</div>
+{% endif %}
+
 {% macro nutrition(dish) %}
 {% if dish.protein_grams or dish.calories %}
 <span class="nutrition">
@@ -76,6 +82,9 @@
 {{ meal_section("breakfast", "Breakfast (optional)", breakfast, breakfast_candidates) }}
 {{ meal_section("lunch", "Lunch", lunch, lunch_candidates) }}
 {{ meal_section("dinner", "Dinner", dinner, dinner_candidates) }}
+{% if is_sunday %}
+{{ meal_section("sunday_special", "Sunday Special — veg treat (optional)", sunday_special, sunday_special_candidates) }}
+{% endif %}
 
 {% if lunch and dinner %}
 <div class="card">

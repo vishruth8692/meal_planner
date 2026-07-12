@@ -122,6 +122,58 @@ def get_candidates(
 
     rnd = random.Random(f"{owner_id}-{today.isoformat()}-{meal_type.value}-{len(eligible)}")
     rnd.shuffle(pool)
+    candidates = pool[:count]
+
+    # Sunday treat: guarantee a non-veg option shows up for households that eat non-veg
+    if today.weekday() == 6 and settings.allow_non_veg and meal_type in (MealType.lunch, MealType.dinner):
+        candidates = _ensure_nonveg_present(candidates, eligible, count)
+    return candidates
+
+
+def _ensure_nonveg_present(candidates: list[Dish], eligible: list[Dish], count: int) -> list[Dish]:
+    if any(d.diet == DietType.non_veg for d in candidates):
+        return candidates
+    nonveg_options = [d for d in eligible if d.diet == DietType.non_veg and d not in candidates]
+    if not nonveg_options:
+        return candidates
+    replacement = nonveg_options[0]
+    if len(candidates) >= count:
+        return candidates[:-1] + [replacement]
+    return candidates + [replacement]
+
+
+def get_special_candidates(
+    session: Session,
+    owner_id: int,
+    count: int = 3,
+    exclude_dish_ids: Optional[set[int]] = None,
+    target_date: Optional[date] = None,
+) -> list[Dish]:
+    """Sunday-only veg special candidates — elaborate dishes marked `is_special`."""
+    today = target_date or date.today()
+    settings = _get_settings(session, owner_id)
+    last_cooked = _last_cooked_dates(session, owner_id)
+    out_of_stock = _out_of_stock_names(session, owner_id)
+    exclude = exclude_dish_ids or set()
+
+    dishes = session.exec(
+        select(Dish).where(Dish.owner_id == owner_id, Dish.active == True, Dish.is_special == True)  # noqa: E712
+    ).all()
+    eligible = []
+    for dish in dishes:
+        if dish.id in exclude or dish.diet == DietType.non_veg:
+            continue
+        if _has_out_of_stock_ingredient(dish, out_of_stock):
+            continue
+        last = last_cooked.get(dish.id)
+        if last and (today - last).days < settings.repeat_gap_days:
+            continue
+        eligible.append(dish)
+
+    eligible.sort(key=lambda d: last_cooked.get(d.id, date.min))
+    pool = eligible[: max(count * 2, count)]
+    rnd = random.Random(f"{owner_id}-{today.isoformat()}-special-{len(eligible)}")
+    rnd.shuffle(pool)
     return pool[:count]
 
 

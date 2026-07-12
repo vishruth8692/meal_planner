@@ -24,7 +24,7 @@ from app.models import (
     User,
 )
 from app.seed import seed_starter_dishes
-from app.suggest import OUT_OF_STOCK_EXPIRY_DAYS, get_candidates, plan_week
+from app.suggest import OUT_OF_STOCK_EXPIRY_DAYS, get_candidates, get_special_candidates, plan_week
 
 app = FastAPI(title="CookHelper")
 app.add_middleware(SessionMiddleware, secret_key=os.environ.get("SECRET_KEY", "dev-only-insecure-secret"))
@@ -124,12 +124,19 @@ def _get_or_create_menu(session: Session, owner_id: int, target_date: date) -> D
     return menu
 
 
-def _whatsapp_text(menu: DailyMenu, breakfast: Optional[Dish], lunch: Dish, dinner: Dish) -> str:
+def _whatsapp_text(
+    menu: DailyMenu, breakfast: Optional[Dish], lunch: Dish, dinner: Dish, sunday_special: Optional[Dish]
+) -> str:
     lines = [f"Menu for {menu.menu_date.strftime('%d %b')}:"]
     if breakfast:
         lines.append(f"Breakfast: {breakfast.name}" + (f" ({breakfast.recipe_url})" if breakfast.recipe_url else ""))
     lines.append(f"Lunch: {lunch.name}" + (f" ({lunch.recipe_url})" if lunch.recipe_url else ""))
     lines.append(f"Dinner: {dinner.name}" + (f" ({dinner.recipe_url})" if dinner.recipe_url else ""))
+    if sunday_special:
+        lines.append(
+            f"Sunday Special: {sunday_special.name}"
+            + (f" ({sunday_special.recipe_url})" if sunday_special.recipe_url else "")
+        )
     if menu.notes:
         lines.append(f"Note: {menu.notes}")
     return "\n".join(lines)
@@ -175,10 +182,18 @@ def dashboard(request: Request, session: Session = Depends(get_session)):
         session, user.id, MealType.dinner, dinner, exclude_for_dinner, today
     )
 
+    is_sunday = today.weekday() == 6
+    sunday_special = session.get(Dish, menu.sunday_special_dish_id) if menu.sunday_special_dish_id else None
+    sunday_special_candidates: list[Dish] = []
+    if is_sunday:
+        sunday_special_candidates = get_special_candidates(session, user.id, count=3, target_date=today)
+        if sunday_special and sunday_special.id not in {c.id for c in sunday_special_candidates}:
+            sunday_special_candidates = [sunday_special] + sunday_special_candidates
+
     all_dishes = session.exec(
         select(Dish).where(Dish.owner_id == user.id, Dish.active == True).order_by(Dish.name)  # noqa: E712
     ).all()
-    whatsapp_text = _whatsapp_text(menu, breakfast, lunch, dinner) if (lunch and dinner) else ""
+    whatsapp_text = _whatsapp_text(menu, breakfast, lunch, dinner, sunday_special) if (lunch and dinner) else ""
 
     return render(
         request,
@@ -192,6 +207,9 @@ def dashboard(request: Request, session: Session = Depends(get_session)):
             "breakfast_candidates": breakfast_candidates,
             "lunch_candidates": lunch_candidates,
             "dinner_candidates": dinner_candidates,
+            "is_sunday": is_sunday,
+            "sunday_special": sunday_special,
+            "sunday_special_candidates": sunday_special_candidates,
             "all_dishes": all_dishes,
             "whatsapp_text": whatsapp_text,
             "today": today,
@@ -210,7 +228,12 @@ def week_view(request: Request, session: Session = Depends(get_session)):
     return render(request, user, "week.html", {"plan": plan})
 
 
-MEAL_FIELDS = {"breakfast": "breakfast_dish_id", "lunch": "lunch_dish_id", "dinner": "dinner_dish_id"}
+MEAL_FIELDS = {
+    "breakfast": "breakfast_dish_id",
+    "lunch": "lunch_dish_id",
+    "dinner": "dinner_dish_id",
+    "sunday_special": "sunday_special_dish_id",
+}
 
 
 @app.post("/menu/select")
@@ -297,7 +320,7 @@ def approve_menu(request: Request, notes: str = Form(""), session: Session = Dep
     menu.notes = notes or None
     menu.status = MenuStatus.approved
     session.commit()
-    for dish_id in (menu.breakfast_dish_id, menu.lunch_dish_id, menu.dinner_dish_id):
+    for dish_id in (menu.breakfast_dish_id, menu.lunch_dish_id, menu.dinner_dish_id, menu.sunday_special_dish_id):
         if dish_id:
             session.add(CookedLog(owner_id=user.id, dish_id=dish_id, cooked_on=today))
     session.commit()
@@ -405,6 +428,7 @@ def add_dish(
     meal_type: str = Form("any"),
     ingredients: str = Form(""),
     recipe_url: str = Form(""),
+    is_special: bool = Form(False),
     session: Session = Depends(get_session),
 ):
     user = _current_user(request, session)
@@ -420,6 +444,7 @@ def add_dish(
         meal_type=MealType(meal_type),
         ingredients=ingredients or None,
         recipe_url=recipe_url or None,
+        is_special=is_special,
     )
     session.add(dish)
     session.commit()

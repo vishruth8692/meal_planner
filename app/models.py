@@ -60,6 +60,7 @@ class Dish(SQLModel, table=True):
     ingredients: Optional[str] = None  # free text, comma separated
     recipe_url: Optional[str] = None
     active: bool = True
+    is_special: bool = False  # elaborate/festive dish, surfaced for the Sunday veg special
 
 
 class CookedLog(SQLModel, table=True):
@@ -83,5 +84,6 @@ class DailyMenu(SQLModel, table=True):
     breakfast_dish_id: Optional[int] = Field(default=None, foreign_key="dish.id")
     lunch_dish_id: Optional[int] = Field(default=None, foreign_key="dish.id")
     dinner_dish_id: Optional[int] = Field(default=None, foreign_key="dish.id")
+    sunday_special_dish_id: Optional[int] = Field(default=None, foreign_key="dish.id")
     status: MenuStatus = MenuStatus.draft
     notes: Optional[str] = None
