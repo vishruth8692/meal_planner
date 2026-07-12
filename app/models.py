@@ -42,7 +42,6 @@ class FamilyMember(SQLModel, table=True):
     owner_id: int = Field(foreign_key="user.id", index=True)
     name: str
     is_kid: bool = False
-    diet: DietType = DietType.veg
     high_protein_focus: bool = False
     restrictions: Optional[str] = None  # free text, e.g. "no peanuts, low oil"
 
@@ -52,6 +51,7 @@ class HouseholdSettings(SQLModel, table=True):
     owner_id: int = Field(foreign_key="user.id", unique=True, index=True)
     repeat_gap_days: int = 3  # don't repeat a dish within this many days
     cuisine_preference: CuisineRegion = CuisineRegion.universal
+    household_diet: DietType = DietType.veg
 
 
 class Dish(SQLModel, table=True):

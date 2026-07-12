@@ -1,7 +1,7 @@
 {% extends "base.html" %}
 {% block content %}
 <h1>Create your account</h1>
-<p class="hint">Each account gets its own family profile, dish catalog, and pantry — nothing is shared with other users.</p>
+<p class="hint">Step 1 of 3. Each account gets its own family profile, dish catalog, and pantry — nothing is shared with other users.</p>
 
 {% if error %}<div class="card error-card">{{ error }}</div>{% endif %}
 
@@ -9,15 +9,6 @@
   <form method="post" action="/signup">
     <label>Username <input type="text" name="username" required autofocus minlength="3" /></label>
     <label>Password <input type="password" name="password" required minlength="6" /></label>
-    <label>
-      Cuisine preference
-      <select name="cuisine_preference">
-        <option value="universal">Both / no preference</option>
-        <option value="north">North Indian</option>
-        <option value="south">South Indian</option>
-      </select>
-    </label>
-    <p class="hint">This filters which dishes get suggested — e.g. South Indian households won't see rajma or chole. You can change this later in Family settings.</p>
     <button type="submit">Sign up</button>
   </form>
 </div>

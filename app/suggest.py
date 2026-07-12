@@ -9,11 +9,12 @@ from app.models import (
     CuisineRegion,
     Dish,
     DietType,
-    FamilyMember,
     HouseholdSettings,
     MealType,
     OutOfStockIngredient,
 )
+
+DIET_RANK = {DietType.veg: 0, DietType.egg: 1, DietType.non_veg: 2}
 
 OUT_OF_STOCK_EXPIRY_DAYS = 7
 
@@ -78,13 +79,8 @@ def _fits_region(dish_region: CuisineRegion, preference: CuisineRegion) -> bool:
     return dish_region == preference
 
 
-def _household_eats_non_veg(session: Session, owner_id: int) -> bool:
-    """Non-veg dishes are eligible whenever at least one family member's diet is non-veg —
-    there's no separate toggle to keep in sync with the family member list."""
-    member = session.exec(
-        select(FamilyMember).where(FamilyMember.owner_id == owner_id, FamilyMember.diet == DietType.non_veg)
-    ).first()
-    return member is not None
+def _fits_diet(dish_diet: DietType, household_diet: DietType) -> bool:
+    return DIET_RANK[dish_diet] <= DIET_RANK[household_diet]
 
 
 def _eligible_dishes(
@@ -96,7 +92,6 @@ def _eligible_dishes(
     out_of_stock: set[str],
     exclude_ids: set[int],
     today: date,
-    allow_non_veg: bool,
 ) -> list[Dish]:
     dishes = session.exec(
         select(Dish).where(Dish.owner_id == owner_id, Dish.active == True)  # noqa: E712
@@ -109,7 +104,7 @@ def _eligible_dishes(
             continue
         if not _fits_region(dish.region, settings.cuisine_preference):
             continue
-        if dish.diet == DietType.non_veg and not allow_non_veg:
+        if not _fits_diet(dish.diet, settings.household_diet):
             continue
         if _has_out_of_stock_ingredient(dish, out_of_stock):
             continue
@@ -133,18 +128,9 @@ def get_candidates(
     settings = _get_settings(session, owner_id)
     last_cooked = _last_cooked_dates(session, owner_id)
     out_of_stock = _out_of_stock_names(session, owner_id)
-    allow_non_veg = _household_eats_non_veg(session, owner_id)
 
     eligible = _eligible_dishes(
-        session,
-        owner_id,
-        meal_type,
-        settings,
-        last_cooked,
-        out_of_stock,
-        exclude_dish_ids or set(),
-        today,
-        allow_non_veg,
+        session, owner_id, meal_type, settings, last_cooked, out_of_stock, exclude_dish_ids or set(), today
     )
     eligible.sort(key=lambda d: last_cooked.get(d.id, date.min))
     pool = eligible[: max(count * 2, count)]
@@ -154,6 +140,7 @@ def get_candidates(
     candidates = pool[:count]
 
     # Sunday treat: guarantee a non-veg option shows up for households that eat non-veg
+    allow_non_veg = settings.household_diet == DietType.non_veg
     if today.weekday() == 6 and allow_non_veg and meal_type in (MealType.lunch, MealType.dinner):
         candidates = _ensure_nonveg_present(candidates, eligible, count)
     return candidates

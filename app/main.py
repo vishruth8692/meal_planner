@@ -65,7 +65,6 @@ def signup(
     request: Request,
     username: str = Form(...),
     password: str = Form(...),
-    cuisine_preference: str = Form("universal"),
     session: Session = Depends(get_session),
 ):
     username = username.strip().lower()
@@ -82,11 +81,11 @@ def signup(
     session.commit()
     session.refresh(user)
     seed_starter_dishes(session, user.id)
-    session.add(HouseholdSettings(owner_id=user.id, cuisine_preference=CuisineRegion(cuisine_preference)))
+    session.add(HouseholdSettings(owner_id=user.id))
     session.commit()
 
     request.session["user_id"] = user.id
-    return RedirectResponse("/profile", status_code=303)
+    return RedirectResponse("/preferences", status_code=303)
 
 
 @app.get("/login")
@@ -113,6 +112,48 @@ def login(
 def logout(request: Request):
     request.session.clear()
     return RedirectResponse("/login", status_code=303)
+
+
+def _get_or_create_settings(session: Session, owner_id: int) -> HouseholdSettings:
+    settings = session.exec(select(HouseholdSettings).where(HouseholdSettings.owner_id == owner_id)).first()
+    if settings is None:
+        settings = HouseholdSettings(owner_id=owner_id)
+        session.add(settings)
+        session.commit()
+        session.refresh(settings)
+    return settings
+
+
+# ---------- onboarding: preferences ----------
+
+
+@app.get("/preferences")
+def preferences_form(request: Request, session: Session = Depends(get_session)):
+    user = _current_user(request, session)
+    if not user:
+        return RedirectResponse("/login", status_code=303)
+    settings = _get_or_create_settings(session, user.id)
+    is_first_member = not session.exec(select(FamilyMember).where(FamilyMember.owner_id == user.id)).first()
+    return render(request, user, "preferences.html", {"settings": settings, "is_onboarding": is_first_member})
+
+
+@app.post("/preferences")
+def save_preferences(
+    request: Request,
+    cuisine_preference: str = Form("universal"),
+    household_diet: str = Form("veg"),
+    repeat_gap_days: int = Form(3),
+    session: Session = Depends(get_session),
+):
+    user = _current_user(request, session)
+    if not user:
+        return RedirectResponse("/login", status_code=303)
+    settings = _get_or_create_settings(session, user.id)
+    settings.cuisine_preference = CuisineRegion(cuisine_preference)
+    settings.household_diet = DietType(household_diet)
+    settings.repeat_gap_days = repeat_gap_days
+    session.commit()
+    return RedirectResponse("/profile", status_code=303)
 
 
 # ---------- dashboard ----------
@@ -342,13 +383,7 @@ def profile(request: Request, session: Session = Depends(get_session)):
     if not user:
         return RedirectResponse("/login", status_code=303)
     members = session.exec(select(FamilyMember).where(FamilyMember.owner_id == user.id)).all()
-    settings = session.exec(select(HouseholdSettings).where(HouseholdSettings.owner_id == user.id)).first()
-    if settings is None:
-        settings = HouseholdSettings(owner_id=user.id)
-        session.add(settings)
-        session.commit()
-        session.refresh(settings)
-    return render(request, user, "profile.html", {"members": members, "settings": settings})
+    return render(request, user, "profile.html", {"members": members})
 
 
 @app.post("/profile/member/add")
@@ -356,7 +391,6 @@ def add_member(
     request: Request,
     name: str = Form(...),
     is_kid: bool = Form(False),
-    diet: str = Form("veg"),
     high_protein_focus: bool = Form(False),
     restrictions: str = Form(""),
     session: Session = Depends(get_session),
@@ -368,7 +402,6 @@ def add_member(
         owner_id=user.id,
         name=name,
         is_kid=is_kid,
-        diet=DietType(diet),
         high_protein_focus=high_protein_focus,
         restrictions=restrictions or None,
     )
@@ -388,26 +421,6 @@ def delete_member(request: Request, member_id: int, session: Session = Depends(g
     if member:
         session.delete(member)
         session.commit()
-    return RedirectResponse("/profile", status_code=303)
-
-
-@app.post("/profile/settings")
-def update_settings(
-    request: Request,
-    repeat_gap_days: int = Form(3),
-    cuisine_preference: str = Form("universal"),
-    session: Session = Depends(get_session),
-):
-    user = _current_user(request, session)
-    if not user:
-        return RedirectResponse("/login", status_code=303)
-    settings = session.exec(select(HouseholdSettings).where(HouseholdSettings.owner_id == user.id)).first()
-    if settings is None:
-        settings = HouseholdSettings(owner_id=user.id)
-        session.add(settings)
-    settings.repeat_gap_days = repeat_gap_days
-    settings.cuisine_preference = CuisineRegion(cuisine_preference)
-    session.commit()
     return RedirectResponse("/profile", status_code=303)
 
 
