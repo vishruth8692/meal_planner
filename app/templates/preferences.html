@@ -2,27 +2,60 @@
 {% block content %}
 <h1>Household Preferences</h1>
 {% if is_onboarding %}
+<div class="step-progress">
+  <div class="step-seg filled"></div>
+  <div class="step-seg filled"></div>
+  <div class="step-seg"></div>
+</div>
 <p class="hint">Step 2 of 3. This shapes every suggestion the app makes — you can change it later too.</p>
 {% endif %}
 
 <div class="card">
   <form method="post" action="/preferences">
-    <label>
-      Diet
-      <select name="household_diet">
-        <option value="veg" {% if settings.household_diet.value == "veg" %}selected{% endif %}>Vegetarian</option>
-        <option value="egg" {% if settings.household_diet.value == "egg" %}selected{% endif %}>Eggetarian</option>
-        <option value="non_veg" {% if settings.household_diet.value == "non_veg" %}selected{% endif %}>Non-vegetarian</option>
-      </select>
-    </label>
-    <label>
-      Cuisine preference
-      <select name="cuisine_preference">
-        <option value="universal" {% if settings.cuisine_preference.value == "universal" %}selected{% endif %}>Both / no preference</option>
-        <option value="north" {% if settings.cuisine_preference.value == "north" %}selected{% endif %}>North Indian</option>
-        <option value="south" {% if settings.cuisine_preference.value == "south" %}selected{% endif %}>South Indian</option>
-      </select>
-    </label>
+    <label>Diet</label>
+    <div class="option-cards">
+      <label class="option-card">
+        <input type="radio" name="household_diet" value="veg" {% if settings.household_diet.value == "veg" %}checked{% endif %} />
+        <span class="option-card-icon">🥦</span>
+        <span class="option-card-label">Vegetarian</span>
+        <span class="option-card-check">&check;</span>
+      </label>
+      <label class="option-card">
+        <input type="radio" name="household_diet" value="egg" {% if settings.household_diet.value == "egg" %}checked{% endif %} />
+        <span class="option-card-icon">🥚</span>
+        <span class="option-card-label">Eggetarian</span>
+        <span class="option-card-check">&check;</span>
+      </label>
+      <label class="option-card">
+        <input type="radio" name="household_diet" value="non_veg" {% if settings.household_diet.value == "non_veg" %}checked{% endif %} />
+        <span class="option-card-icon">🍗</span>
+        <span class="option-card-label">Non-vegetarian</span>
+        <span class="option-card-check">&check;</span>
+      </label>
+    </div>
+
+    <label>Cuisine preference</label>
+    <div class="option-cards">
+      <label class="option-card">
+        <input type="radio" name="cuisine_preference" value="south" {% if settings.cuisine_preference.value == "south" %}checked{% endif %} />
+        <span class="option-card-icon">🥥</span>
+        <span class="option-card-label">South Indian</span>
+        <span class="option-card-check">&check;</span>
+      </label>
+      <label class="option-card">
+        <input type="radio" name="cuisine_preference" value="north" {% if settings.cuisine_preference.value == "north" %}checked{% endif %} />
+        <span class="option-card-icon">🫓</span>
+        <span class="option-card-label">North Indian</span>
+        <span class="option-card-check">&check;</span>
+      </label>
+      <label class="option-card">
+        <input type="radio" name="cuisine_preference" value="universal" {% if settings.cuisine_preference.value == "universal" %}checked{% endif %} />
+        <span class="option-card-icon">🍽️</span>
+        <span class="option-card-label">Both / no preference</span>
+        <span class="option-card-check">&check;</span>
+      </label>
+    </div>
+
     <label>
       Don't repeat a dish within (days)
       <input type="number" name="repeat_gap_days" value="{{ settings.repeat_gap_days }}" min="0" />

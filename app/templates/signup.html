@@ -1,6 +1,11 @@
 {% extends "base.html" %}
 {% block content %}
 <h1>Create your account</h1>
+<div class="step-progress">
+  <div class="step-seg filled"></div>
+  <div class="step-seg"></div>
+  <div class="step-seg"></div>
+</div>
 <p class="hint">Step 1 of 3. Each account gets its own family profile, dish catalog, and pantry — nothing is shared with other users.</p>
 
 {% if error %}<div class="card error-card">{{ error }}</div>{% endif %}
@@ -9,7 +14,7 @@
   <form method="post" action="/signup">
     <label>Username <input type="text" name="username" required autofocus minlength="3" /></label>
     <label>Password <input type="password" name="password" required minlength="6" /></label>
-    <button type="submit">Sign up</button>
+    <button type="submit">Continue</button>
   </form>
 </div>
 <p class="hint">Already have an account? <a href="/login">Log in</a></p>
