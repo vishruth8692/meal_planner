@@ -8,16 +8,9 @@
   <div class="step-seg filled"></div>
   <div class="step-seg filled"></div>
 </div>
-<div class="card onboarding">
-  <p>Step 3 of 3. Add at least one family member to get started — then head to <strong>Today</strong> for menu suggestions.</p>
-</div>
-{% else %}
-<div class="card onboarding">
-  <a href="/">&larr; Continue to today's menu</a>
-</div>
+<p class="hint">Step 3 of 3. Add at least one family member to get started.</p>
 {% endif %}
 
-{% if members %}
 {% for m in members %}
 <div class="card member-row">
   <div class="avatar">{{ m.name[0]|upper }}</div>
@@ -32,7 +25,6 @@
   </form>
 </div>
 {% endfor %}
-{% endif %}
 
 <div class="card add-member-card">
   <h2>{{ "Who are you cooking for?" if not members else "Add member" }}</h2>
@@ -46,5 +38,6 @@
   </form>
 </div>
 
-<p class="hint"><a href="/preferences">Edit household diet &amp; cuisine preferences &rarr;</a></p>
+<a href="/" class="button-link">{{ "Finish & go to today" if not members else "Continue to today's menu" }}</a>
+<p class="hint" style="text-align: center; margin-top: 10px;"><a href="/preferences">Edit household diet &amp; cuisine preferences</a></p>
 {% endblock %}

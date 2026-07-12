@@ -96,6 +96,17 @@ button.secondary {
   background: var(--chip-bg);
   color: #4a453d;
 }
+.button-link {
+  display: block;
+  text-align: center;
+  background: var(--accent);
+  color: white;
+  padding: 13px 16px;
+  border-radius: 10px;
+  font-size: 0.95rem;
+  font-weight: 700;
+  text-decoration: none;
+}
 .row { display: flex; gap: 8px; }
 table { width: 100%; border-collapse: collapse; font-size: 0.9rem; }
 th, td { text-align: left; padding: 6px 8px; border-bottom: 1px solid #eee; }
